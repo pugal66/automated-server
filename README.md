@@ -64,13 +64,16 @@ Cloud-init handles provisioning across 5 main boot stages:
 
 - **Systemd service**: Created `/etc/systemd/system/testpress-app.service` to manage the container. This handles starting the container on boot, stopping it cleanly, and restarting it automatically if it crashes (`Restart=always`).
 - **Health check**: Added a `HEALTHCHECK` rule in the `Dockerfile` using Python's standard `urllib` library to ping `http://localhost:8080/` every 30 seconds.
-- **First boot detection**: Cloud-init looks at `/var/lib/cloud/instance/` and compares the cached `instance-id` with the current one. If it's missing or changed, cloud-init treats the machine as a fresh install.
 - **Cloud-init vs Dockerfile**: Cloud-init configures the VM itself (OS, users, storage, system services). A Dockerfile packages the app and its dependencies into a portable container image.
-- **User-data vs Metadata**: *Metadata* is machine information supplied by the hypervisor/cloud (IP, instance ID, hostname). *User-data* is the script or `#cloud-config` we pass in to customize the server.
-
 ---
 
-## 5. Cleanup
+## 5. Key Learnings
+
+- Learnt about a new tool — cloud-init — and how it sets up a fresh server automatically without needing manual SSH.
+- Learnt what idempotency means in practice and how to write scripts that don't fail if they run more than once.
+- Understood the difference between cloud-init (setting up the VM) and Dockerfile (packaging the app).
+
+## 6. Cleanup
 
 To delete and remove the VM:
 ```bash
