@@ -1,5 +1,7 @@
 #cloud-config
 
+hostname: testpress-server
+
 package_update: true
 
 packages:
@@ -8,6 +10,9 @@ packages:
   - curl
   - ffmpeg
 
+groups:
+  - docker
+
 users:
   - name: testpress
     groups: [docker]
@@ -15,6 +20,7 @@ users:
     sudo: ALL=(ALL) NOPASSWD:ALL
 
 write_files:
+  # 1. Application environment configuration (created as root, chowned to testpress in runcmd)
   - path: /opt/testpress/app.env
     owner: root:root
     permissions: '0640'
@@ -22,3 +28,40 @@ write_files:
       APP_NAME=Testpress
       APP_PORT=8080
       APP_ENV=production
+
+  # 2. Systemd service unit to manage Docker application lifecycle
+  - path: /etc/systemd/system/testpress-app.service
+    owner: root:root
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Testpress Docker Application
+      After=docker.service
+      Requires=docker.service
+
+      [Service]
+      TimeoutStartSec=0
+      Restart=always
+      ExecStartPre=-/usr/bin/docker stop testpress-app
+      ExecStartPre=-/usr/bin/docker rm testpress-app
+      ExecStart=/usr/bin/docker run --name testpress-app -p 8080:8080 --env-file /opt/testpress/app.env testpress-app
+      ExecStop=/usr/bin/docker stop testpress-app
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  # 1. Idempotently clone or update application repository
+  - |
+    if [ -d "/opt/testpress/app/.git" ]; then
+      git -C /opt/testpress/app pull
+    else
+      git clone https://github.com/pugal66/automated-server.git /opt/testpress/app
+    fi
+  # 2. Assign ownership of the /opt/testpress application directory to testpress:docker
+  - chown -R testpress:docker /opt/testpress
+  # 3. Build the Docker image
+  - docker build -t testpress-app /opt/testpress/app
+  # 4. Reload systemd, enable service to start on boot, and start it now
+  - systemctl daemon-reload
+  - systemctl enable --now testpress-app
